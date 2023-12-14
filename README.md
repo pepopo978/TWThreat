@@ -4,6 +4,10 @@ Threat Meter for Turtle WoW
 Requirements: in `party` or `raid`, attacking `elite` creatures or `bosses`.
 <br>
 ## Changes
+### 1.2.3 unofficial balake version
+- Queries threat when the target is in combat even if player is not in combat or did not do any threat on the target yet.
+- Standarized update speed across specs.
+- TANK MODE IS UNTESTED. If you like using that please volunteer to tell me if it's bug-free or not.
 
 ### v1.2.3
 - Fixes for TW patch 16.0
