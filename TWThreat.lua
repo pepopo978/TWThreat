@@ -50,7 +50,7 @@ TWT.shouldRelay = false
 TWT.inCombat = false
 TWT.healerMasterTarget = ''
 
-TWT.updateSpeed = 0.5
+TWT.updateSpeed = 0.25
 
 TWT.targetFrameVisible = false
 TWT.PFUItargetFrameVisible = false
