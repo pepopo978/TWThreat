@@ -47,9 +47,10 @@ TWT.threats = {}
 TWT.targetName = ''
 TWT.relayTo = {}
 TWT.shouldRelay = false
+TWT.inCombat = false
 TWT.healerMasterTarget = ''
 
-TWT.updateSpeed = 1
+TWT.updateSpeed = 0.5
 
 TWT.targetFrameVisible = false
 TWT.PFUItargetFrameVisible = false
@@ -105,17 +106,6 @@ TWT.fonts = {
     'Sniglet', 'SquadaOne',
 }
 
-TWT.updateSpeeds = {
-    ['warrior'] = { 0.7, 0.5, 0.5 },
-    ['paladin'] = { 1, 0.5, 0.7 },
-    ['hunter'] = { 0.7, 0.7, 0.7 },
-    ['rogue'] = { 0.5, 0.5, 0.5 },
-    ['priest'] = { 1, 1, 0.6 },
-    ['shaman'] = { 0.7, 0.5, 1 },
-    ['mage'] = { 1, 0.5, 0.7 },
-    ['warlock'] = { 0.8, 1, 0.6 },
-    ['druid'] = { 0.8, 0.5, 1 },
-}
 
 function twtprint(a)
     if a == nil then
@@ -227,7 +217,7 @@ TWT:RegisterEvent("PLAYER_ENTERING_WORLD")
 TWT:RegisterEvent("PARTY_MEMBERS_CHANGED")
 
 TWT.threatQuery = CreateFrame("Frame")
-TWT.threatQuery:Hide()
+TWT.threatQuery:Show()
 
 local timeStart = GetTime()
 local totalPackets = 0
@@ -246,12 +236,12 @@ TWT:SetScript("OnEvent", function()
             TWT.sendMyVersion()
             TWT.combatEnd()
             if UnitAffectingCombat('player') then
-                TWT.combatStart()
+                TWT.combatStart(true)
             end
             return true
         end
+        
         if event == 'CHAT_MSG_ADDON' and __find(arg2, TWT.threatApi, 1, true) then
-
             totalPackets = totalPackets + 1
             totalData = totalData + __strlen(arg2)
 
@@ -266,8 +256,8 @@ TWT:SetScript("OnEvent", function()
 
             return TWT.handleThreatPacket(threatData)
         end
-        if event == 'CHAT_MSG_ADDON' and arg1 == TWT.prefix then
 
+        if event == 'CHAT_MSG_ADDON' and arg1 == TWT.prefix then
             if __substr(arg2, 1, 11) == 'TWTVersion:' and arg4 ~= TWT.name then
                 if not TWT.showedUpdateNotification then
                     local verEx = __explode(arg2, ':')
@@ -324,7 +314,7 @@ TWT:SetScript("OnEvent", function()
 
         end
         if event == "PLAYER_REGEN_DISABLED" then
-            return TWT.combatStart()
+            return TWT.combatStart(true)
         end
         if event == "PLAYER_REGEN_ENABLED" then
             return TWT.combatEnd()
@@ -788,6 +778,17 @@ function TWT.handleThreatPacket(packet)
         end
     end
 
+    if not TWT.threats[TWT.name] then
+        TWT.threats[TWT.name] = {
+                threat = 0,
+                tank = 0,
+                perc = 0,
+                melee = 0,
+                tps = 0,
+                class = __lower(UnitClass('player'))
+            }
+    end
+    
     TWT.calcAGROPerc()
 
     TWT.updateUI()
@@ -862,8 +863,11 @@ function TWT.calcAGROPerc()
 
 end
 
-function TWT.combatStart()
-
+function TWT.combatStart(startforced)
+    if TWT.inCombat == true and startforced ~= true then
+        return
+    end
+    TWT.inCombat = true
     TWT.updateTargetFrameThreatIndicators(-1, '')
     timeStart = GetTime()
     totalPackets = 0
@@ -908,14 +912,11 @@ function TWT.combatStart()
     end
 
     local sendTex = TWT.spec[1].texture
-    TWT.updateSpeed = TWT.updateSpeeds[TWT.class][1]
     if TWT.spec[2].talents > TWT.spec[1].talents and TWT.spec[2].talents > TWT.spec[3].talents then
         sendTex = TWT.spec[2].texture
-        TWT.updateSpeed = TWT.updateSpeeds[TWT.class][2]
     end
     if TWT.spec[3].talents > TWT.spec[1].talents and TWT.spec[3].talents > TWT.spec[2].talents then
         sendTex = TWT.spec[3].texture
-        TWT.updateSpeed = TWT.updateSpeeds[TWT.class][3]
     end
 
     if TWT.class == 'warrior' and __lower(sendTex) == 'ability_rogue_eviscerate' then
@@ -939,7 +940,7 @@ function TWT.combatStart()
 end
 
 function TWT.combatEnd()
-
+    TWT.inCombat = false
     TWT.updateTargetFrameThreatIndicators(-1, '')
 
     twtdebug('time = ' .. (TWT.round(GetTime() - timeStart)) .. 's packets = ' .. totalPackets .. ' ' ..
@@ -961,7 +962,6 @@ function TWT.combatEnd()
 
     TWT.updateUI('combatEnd')
 
-    TWT.threatQuery:Hide()
     TWT.barAnimator:Hide()
 
     if TWT_CONFIG.tankMode then
@@ -1094,7 +1094,7 @@ function TWT.targetChanged()
     end
 
     -- not in combat
-    if not UnitAffectingCombat('player') or not UnitAffectingCombat('target') then
+    if not UnitAffectingCombat('target') then
         return false
     end
 
@@ -1157,7 +1157,7 @@ function TWT.updateUI(from)
 
     TWT.hideThreatFrames()
 
-    if not UnitAffectingCombat('player') and not _G['TWTMainSettings']:IsVisible() then
+    if TWT.inCombat ~= true and not _G['TWTMainSettings']:IsVisible() then
         TWT.updateTargetFrameThreatIndicators(-1)
         return false
     end
@@ -1269,7 +1269,7 @@ function TWT.updateUI(from)
 
                 _G['TWThreat' .. index .. 'Threat']:SetText(TWT.formatNumber(data.threat))
 
-                TWT.barAnimator:animateTo(index, data.perc)
+                if data.perc == 0 then TWT.barAnimator:animateTo(index, empty) else TWT.barAnimator:animateTo(index, data.perc) end
 
             elseif name == TWT.AGRO then
 
@@ -1377,6 +1377,11 @@ function TWT.barAnimator:animateTo(index, perc, instant)
         return false
     end
 
+    if perc == empty then
+        _G['TWThreat' .. index .. 'BG']:SetWidth(2)
+        return true
+    end
+    
     perc = TWT.round(perc)
     perc = perc > 100 and 100 or perc
 
@@ -1432,6 +1437,7 @@ end)
 TWT.threatQuery:SetScript("OnHide", function()
 end)
 TWT.threatQuery:SetScript("OnUpdate", function()
+    if not this.startTime then this.startTime = GetTime() end
     local plus = TWT.updateSpeed
     local gt = GetTime() * 1000
     local st = (this.startTime + plus) * 1000
@@ -1440,8 +1446,8 @@ TWT.threatQuery:SetScript("OnUpdate", function()
         if GetNumRaidMembers() == 0 and GetNumPartyMembers() == 0 then
             return false
         end
-        if UnitAffectingCombat('player') and UnitAffectingCombat('target') then
-
+        if UnitAffectingCombat('target') then
+            TWT.combatStart()
             if TWT.targetName == '' then
                 twtdebug('threatQuery target = blank ')
                 -- try to re-get target
