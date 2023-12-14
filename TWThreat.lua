@@ -1083,16 +1083,6 @@ function TWT.targetChanged()
         return false
     end
 
-    -- non interesting target
-    if UnitClassification('target') ~= 'worldboss' and UnitClassification('target') ~= 'elite' then
-        return false
-    end
-
-    -- no raid or party
-    if GetNumRaidMembers() == 0 and GetNumPartyMembers() == 0 then
-        return false
-    end
-
     -- not in combat
     if not UnitAffectingCombat('target') then
         return false
